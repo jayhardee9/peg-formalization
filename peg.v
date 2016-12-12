@@ -100,9 +100,9 @@ Section PEG.
   
   Lemma interp_empty : forall n xs y, Interp (empty, xs) (n, y) -> n = 1 /\ y = None.
   Proof.
-    intros.
-    inversion H.
-    split; auto.
+    intros n xs y interp.
+    inversion interp.
+    auto.
   Qed.
   
   Lemma interp_steps : forall e xs n y, Interp (e, xs) (n, y) -> n > 0.
@@ -113,27 +113,27 @@ Section PEG.
 
   Lemma empty_string_prefix : forall x, prefix "" x = true.
   Proof.
-    intros.
+    intros x.
     induction x; reflexivity.
   Qed.
   
   Lemma char_prefix :
     forall (a : ascii) (xs : string), prefix (String a "") (String a xs) = true.
   Proof.
-    intros. simpl.
-    destruct (ascii_dec a a) as [ Heq | C ].
+    intros a xs. simpl.
+    destruct (ascii_dec a a) as [ a_eq_a | a_neq_a ].
     { apply empty_string_prefix. }
-    { unfold not in C. elimtype False. apply C. reflexivity. }
+    { unfold not in a_neq_a. elimtype False. apply a_neq_a. reflexivity. }
   Qed.
 
   Lemma prefix_append : forall x y, prefix x (x ++ y) = true.
   Proof.
-    intros.
-    induction x.
-    - simpl. induction y; reflexivity.
-    - simpl. destruct (ascii_dec a a) as [ Heq | C ].
+    intros x y.
+    induction x; simpl.
+    - induction y; reflexivity.
+    - destruct (ascii_dec a a) as [ a_eq_a | a_neq_a ].
       + apply IHx.
-      + unfold not in C. elimtype False. apply C. reflexivity.
+      + unfold not in a_neq_a. elimtype False. apply a_neq_a. reflexivity.
   Qed.
     
   Theorem interp_prefix : forall n x y e, Interp (e, x) (n, Some y) -> (prefix y x) = true.
@@ -144,24 +144,25 @@ Section PEG.
       inversion interp; repeat(apply char_prefix ||
                                apply prefix_append ||
                                apply empty_string_prefix).
-      + assert(n0_lt_n: n0 < n). { omega. }
-        specialize (H n0). apply H in H1; auto.
-      + assert(n2_lt_n: n2 < n). { omega. }
-        specialize (H n2).
-        apply H in H5; auto.
+      + specialize (H n0). apply H in H1.
+        { auto. }
+        { omega. }
+      + specialize (H n2). apply H in H5.
+        { auto. }
+        { omega. }
   Qed.
 
   Lemma append_assoc : forall s1 s2 s3, (s1 ++ (s2 ++ s3))%string = ((s1 ++ s2) ++ s3)%string.
   Proof.
-    intros.
-    induction s1.
+    intros s1 s2 s3.
+    induction s1; simpl.
     - reflexivity.
-    - simpl. rewrite -> IHs1. reflexivity.
+    - rewrite -> IHs1. reflexivity.
   Qed.
 
   Lemma solve_append : forall x y z, (x ++ y = x ++ z)%string -> y = z.
   Proof.
-    intros.
+    intros x y z H.
     induction x.
     - auto.
     - apply IHx. simpl in H. inversion H. reflexivity.
@@ -179,35 +180,21 @@ Section PEG.
         auto.
       }
       { (* terminal c *)
-        inversion interp1; auto.
-        inversion interp2; auto.
-        {
-          rewrite <- H7 in H3.
-          inversion H3.
-          absurd(c = b); auto.
-        }
-        {
-          rewrite <- H7 in H3.
-          inversion H3.
-        }
-        + inversion interp2; auto. rewrite <- H8 in H3. inversion H3. absurd(b = c); auto.
-        + inversion interp2; auto. rewrite <- H7 in H3. inversion H3.
+        inversion interp1; clear interp1; inversion interp2; clear interp2; subst; auto;
+          inversion H7 || inversion H8;
+          subst;
+          elim H6 || elim H2;
+          reflexivity.
       }
       { (* nonTerminal c *)
-        inversion interp1.
-        inversion interp2.
-        subst x n1 n2. (* clean up inversion's mess *)
+        inversion interp1; clear interp1; inversion interp2; clear interp2; subst.
+
         assert(n_lt_n_p_1: n < n + 1).
         { omega. }
-        specialize (H n n_lt_n_p_1 n0 (Some o) (Some o0) (Rule c) xs).
-        apply H in H2.
-        split.
-        + assert(K: n = n0 -> n + 1 = n0 + 1).
-          { omega. }
-          apply K.
-          apply H2.
-        + apply H2.
-        + apply H7.
+        specialize (H n n_lt_n_p_1 n0 (Some o) (Some o0) (Rule c) x H2 H7).
+        subst.
+        inversion H.
+        split; auto.
       }
       { (* sequence e1 e2 *)
         inversion interp1.
@@ -575,41 +562,17 @@ Section PEG.
         }
       }
       { (* isnt e *)
-        inversion interp1; clear interp1.
-        {
-          assert(n_small: n < n1).
-          { omega. }
-          inversion interp2; clear interp2.
-          {
-            rewrite H3 in H2. rewrite H8 in H7.
-            specialize (H n n_small n0 (Some x0) (Some x1) e x H2 H7).
-            inversion H.
-            rewrite H11.
-            split; reflexivity.
-          }
-          {
-            rewrite H3 in H2. rewrite H8 in H7.
-            specialize(H n n_small n0 (Some x0) None e x H2 H7).
-            inversion H. inversion H12.
-          }
-        }
-        {
-          assert(n_small: n < n1).
-          { omega. }
-          inversion interp2; clear interp2.
-          {
-            rewrite H3 in H2. rewrite H8 in H7.
-            specialize (H n n_small n0 None (Some x1) e x H2 H7).
-            inversion H. inversion H12.
-          }
-          {
-            rewrite H3 in H2. rewrite H8 in H7.
-            specialize (H n n_small n0 None None e x H2 H7).
-            inversion H.
-            rewrite H11.
-            split; reflexivity.
-          }
-        }
+        
+        inversion interp1; clear interp1; inversion interp2; clear interp2; subst;
+          rewrite H8 in H7; assert(n_small: n < n + 1); repeat(try omega);
+            (specialize (H n n_small n0 (Some x0) (Some x1) e (x0 ++ y)%string H2 H7) ||
+             specialize (H n n_small n0 (Some x0)  None     e (x0 ++ y)%string H2 H7) ||
+             specialize (H n n_small n0  None     (Some x1) e (x0 ++ y)%string H2 H7) ||
+             specialize (H n n_small n0  None      None     e (x0 ++ y)%string H2 H7));
+            inversion H;
+            try(subst);
+            inversion H3;
+            try(split; reflexivity).
       }
   Qed.
   
