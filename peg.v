@@ -24,7 +24,7 @@ Section PEG.
     }
     unfold Q in Q_n_all. apply H in Q_n_all. auto.
   Qed.
-    
+
   Variable NonTerminalType : Set.
   
   Inductive ParsingExpression : Set :=
@@ -41,7 +41,7 @@ Section PEG.
   Check not ("a"%char = "b"%char).
   Inductive Interp : ParsingExpression * string -> nat * option string -> Prop :=
   | Empty :
-      forall (xs : string), Interp (empty, xs) (1, None)
+      forall (xs : string), Interp (empty, xs) (1, Some ""%string)
   | TerminalSuccess :
       forall (a : ascii) (xs : string),
         Interp (terminal a, String a xs) (1, Some (String a EmptyString))
@@ -98,7 +98,7 @@ Section PEG.
         Interp (isnt e, append x y) (n + 1, Some EmptyString).
   Check Interp_ind.
   
-  Lemma interp_empty : forall n xs y, Interp (empty, xs) (n, y) -> n = 1 /\ y = None.
+  Lemma interp_empty : forall n xs y, Interp (empty, xs) (n, y) -> n = 1 /\ y = Some ""%string.
   Proof.
     intros n xs y interp.
     inversion interp.
@@ -575,4 +575,57 @@ Section PEG.
             try(split; reflexivity).
       }
   Qed.
+
+  Lemma star_increases_steps : forall n1 e x o1, Interp (e, x) (n1, o1) -> forall n2 o2, Interp (star e, x) (n2, o2) -> n1 < n2.
+  Proof.
+    induction n1 using strong_induction.
+    intros.
+    inversion H1; clear H1; subst.
+    + assert(n0 = n1 /\ (Some x1) = o1).
+      {
+        apply interp_is_a_function with(e:=e) (x:=((x1 ++ x2) ++ y)%string); auto.
+      }
+      inversion H1.
+      omega.
+    + assert(n1 = n /\ o1 = None).
+      {
+        apply interp_is_a_function with(e:=e) (x:=x); auto.
+      }        
+      inversion H1.
+      omega.
+  Qed.
   
+  Theorem star_loop_condition : forall n1 e x, Interp (e, x) (n1, Some ""%string) -> forall n2 o, ~ Interp (star e, x) (n2, o).
+  Proof.
+    intros.
+    intro.
+    inversion H0.
+    - subst.
+      assert(n0 = n1 /\ Some x1 = Some ""%string).
+      {
+        apply interp_is_a_function with (e:=e) (x:=((x1 ++ x2) ++ y)%string); auto.
+      }
+      inversion H1. inversion H3. clear H1. clear H3.
+      subst. simpl in H.
+      simpl in H0.
+      assert(n3 = n1 + n3 + 1 /\ Some x2 = Some x2).
+      {
+        apply interp_is_a_function with (e:=star e) (x:=(x2 ++ y)%string); auto.
+      }
+      inversion H1.
+      assert(n3 <> n1 + n3 + 1).
+      {
+        omega.
+      }
+      rewrite <- H2 in H5.
+      apply H5.
+      reflexivity.
+    - assert(n1 = n /\ Some ""%string = None).
+      {
+        apply interp_is_a_function with (e:=e) (x:=x); auto.
+      }
+      inversion H6. inversion H8.
+  Qed.
+  
+        
+      
