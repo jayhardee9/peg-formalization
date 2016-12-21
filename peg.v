@@ -594,38 +594,44 @@ Section PEG.
       inversion H1.
       omega.
   Qed.
-  
-  Theorem star_loop_condition : forall n1 e x, Interp (e, x) (n1, Some ""%string) -> forall n2 o, ~ Interp (star e, x) (n2, o).
+
+  Definition handles (e : ParsingExpression) (x : string) := exists n o, Interp (e, x) (n, o).
+
+  Theorem star_loop_condition : forall n1 e x, Interp (e, x) (n1, Some ""%string) -> ~ handles (star e) x.
   Proof.
     intros.
     intro.
-    inversion H0.
+    unfold handles in H0.
+    elim H0.
+    intro n.
+    intros.
+    elim H1.
+    intro o.
+    intros.
+    inversion H2.
     - subst.
       assert(n0 = n1 /\ Some x1 = Some ""%string).
       {
         apply interp_is_a_function with (e:=e) (x:=((x1 ++ x2) ++ y)%string); auto.
       }
-      inversion H1. inversion H3. clear H1. clear H3.
-      subst. simpl in H.
-      simpl in H0.
-      assert(n3 = n1 + n3 + 1 /\ Some x2 = Some x2).
+      inversion H3. clear H3. inversion H5. clear H5.
+      subst. simpl in H2.
+      assert(n2 = n1 + n2 + 1 /\ Some x2 = Some x2).
       {
         apply interp_is_a_function with (e:=star e) (x:=(x2 ++ y)%string); auto.
       }
-      inversion H1.
-      assert(n3 <> n1 + n3 + 1).
+      inversion H3.
+      assert(n2 <> n1 + n2 + 1).
       {
         omega.
       }
-      rewrite <- H2 in H5.
-      apply H5.
+      rewrite <- H4 in H7.
+      apply H7.
       reflexivity.
-    - assert(n1 = n /\ Some ""%string = None).
+    - assert(n1 = n0 /\ Some""%string = None).
       {
         apply interp_is_a_function with (e:=e) (x:=x); auto.
       }
-      inversion H6. inversion H8.
+      inversion H8.
+      inversion H10.
   Qed.
-  
-        
-      
